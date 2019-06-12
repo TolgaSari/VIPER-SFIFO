@@ -48,6 +48,7 @@
 #include "cpu/testers/rubytest/RubyTester.hh"
 #include "debug/GPUCoalescer.hh"
 #include "debug/MemoryAccess.hh"
+#include "debug/SFIFO.hh" // Tolga - modification
 #include "mem/packet.hh"
 #include "mem/ruby/common/SubBlock.hh"
 #include "mem/ruby/network/MessageBuffer.hh"
@@ -120,9 +121,8 @@ void VIPERCoalescer::inc_counter(bool isAcquire, HSAScope accessScope)
 RequestStatus
 VIPERCoalescer::makeRequest(PacketPtr pkt)
 {
-	// Tolga start
-    HSAScope accessScope = reqScopeToHSAScope(pkt->req);
-	// Tolga end
+    HSAScope accessScope = reqScopeToHSAScope(pkt->req); // Tolga - modification.
+
     if (m_outstanding_wb | m_outstanding_inv) {
         DPRINTF(GPUCoalescer,
                 "There are %d Writebacks and %d Invalidatons\n",
@@ -136,12 +136,12 @@ VIPERCoalescer::makeRequest(PacketPtr pkt)
             // If it is a Kerenl Begin flush the cache
             if (pkt->req->isAcquire() && (m_outstanding_inv == 0)) {
                 invL1();
-		        inc_counter(true, accessScope);	
+		        inc_counter(true, accessScope);	// Tolga - modification
             }
 
             if (pkt->req->isRelease()) {
                 insertKernel(pkt->req->contextId(), pkt);
-                inc_counter(false, accessScope);
+                inc_counter(false, accessScope);// Tolga - modification
             }
             return RequestStatus_Issued;
         }
@@ -150,10 +150,10 @@ VIPERCoalescer::makeRequest(PacketPtr pkt)
         // Flush Dirty Data on Kernel End
         // isKernel + isRelease
 
-	    inc_counter(false, accessScope);	
+	    inc_counter(false, accessScope);	// Tolga - modification
 
         insertKernel(pkt->req->contextId(), pkt);
-        wbL1(reqScopeToHSAScope(pkt->req), pkt->req->getPaddr());
+        wbL1(reqScopeToHSAScope(pkt->req), pkt->req->getPaddr());// Tolga - modification
         if (m_outstanding_wb == 0) {
             for (auto it =  kernelEndList.begin(); it != kernelEndList.end(); it++) {
                 newKernelEnds.push_back(it->first);
@@ -171,13 +171,13 @@ VIPERCoalescer::makeRequest(PacketPtr pkt)
     } else if (pkt->req->isKernel() && pkt->req->isAcquire()) {
         // Invalidate clean Data on Kernel Begin
         // isKernel + isAcquire
-	    inc_counter(true, accessScope);	
+	    inc_counter(true, accessScope);	// Tolga - modification
         invL1();
     } else if (pkt->req->isAcquire() && pkt->req->isRelease()) {
         // Deschedule the AtomicAcqRel and
         // Flush and Invalidate the L1 cache
-		if (pkt->req->isRelease()) 
-	        inc_counter(false, accessScope);	
+		if (pkt->req->isRelease()) // Tolga - modification
+	        inc_counter(false, accessScope);	// Tolga - modification
 		else
 	        inc_counter(true, accessScope);	
 
@@ -198,7 +198,7 @@ VIPERCoalescer::makeRequest(PacketPtr pkt)
     } else if (pkt->req->isAcquire()) {
         // LoadAcq or AtomicAcq
         // Invalidate the L1 cache
-        inc_counter(true, accessScope);
+        inc_counter(true, accessScope);// Tolga - modification
         invL1();
     }
     // Request was successful
@@ -275,8 +275,11 @@ VIPERCoalescer::invL1()
   * Writeback L1 cache (Release)
   */
 void
-VIPERCoalescer::wbL1(HSAScope msg_scope, uint64_t msg_addr)
+VIPERCoalescer::wbL1(HSAScope msg_scope, uint64_t msg_addr)// Tolga - modification
 {
+	DPRINTF(GPUCoalescer,
+            "zzz - Inside wbL1, making request with msg addr = %d\n", msg_addr);
+
     std::shared_ptr<RubyRequest> msg = std::make_shared<RubyRequest>(
             clockEdge(), msg_addr, (uint8_t*) 0, 0, 0,
             RubyRequestType_Sfifo_Release, RubyAccessMode_Supervisor,
