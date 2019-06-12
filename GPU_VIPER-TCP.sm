@@ -311,18 +311,18 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
         {
             peek(releaseBuffer_in, TriggerMsg) // block_on ?
             {       
+				DPRINTF(SFIFO, "%s\n", in_msg);
                 TBE tbe := TBEs.lookup(mRelFIFO.front());
                 Entry cache_entry := getCacheEntry(mRelFIFO.front());
 
 				//assert(tbe != NULL);
 				assert(is_valid(cache_entry));
 				//if(tbe.numAtomics == 0)
-				if(true)
-				{ 
-					if(in_msg.Type == TriggerType:Sfifo_Release)
-					{
-						trigger(Event:SfifoRelease, mRelFIFO.front(), cache_entry, tbe);
-					}
+				 
+				if(in_msg.Type == TriggerType:Sfifo_Release)
+				{
+					trigger(Event:SfifoRelease, mRelFIFO.front(), cache_entry, tbe);
+					DPRINTF(SFIFO, "triggering SfifoRelease\n");
 				}
             }
         } 
@@ -365,6 +365,7 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
                 trigger(Event:SfifoRelease, in_msg.LineAddress, cache_entry, tbe);
 				blockMq := true;
 				firstPop := true;
+				DPRINTF(SFIFO, "First SfifoRelease from mandatory queue\n");
             } else {
               error("Unexpected Request Message from VIC");
               if (is_valid(cache_entry) || L1cache.cacheAvail(in_msg.LineAddress)) {
