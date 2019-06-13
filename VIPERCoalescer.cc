@@ -33,6 +33,8 @@
  * Author: Sooraj Puthoor
  */
 
+#define USE_SFIFO
+
 #include "base/misc.hh"
 #include "base/str.hh"
 #include "config/the_isa.hh"
@@ -277,45 +279,43 @@ VIPERCoalescer::invL1()
 void
 VIPERCoalescer::wbL1(HSAScope msg_scope, uint64_t msg_addr)// Tolga - modification
 {
-	DPRINTF(SFIFO,
-            "Inside wbL1, making request with msg addr = %d\n", msg_addr);
+	#ifdef USE_SFIFO
+			
+	  DPRINTF(SFIFO,
+			  "Inside wbL1, making request with msg addr = %lx\n", (long) msg_addr);
 
-    std::shared_ptr<RubyRequest> msg = std::make_shared<RubyRequest>(
-            clockEdge(), msg_addr, (uint8_t*) 0, 0, 0,
-            RubyRequestType_Sfifo_Release, RubyAccessMode_Supervisor,
-            nullptr, PrefetchBit_No, 100, 99, msg_scope);
-    assert(m_mandatory_q_ptr != NULL);
-    m_mandatory_q_ptr->enqueue(msg, clockEdge(), m_data_cache_hit_latency);
- 
-	DPRINTF(SFIFO, "Exiting wbL1\n");
-    /*
+	  std::shared_ptr<RubyRequest> msg = std::make_shared<RubyRequest>(
+			  clockEdge(), msg_addr, (uint8_t*) 0, 0, 0,
+			  RubyRequestType_Sfifo_Release, RubyAccessMode_Supervisor,
+			  nullptr, PrefetchBit_No, 100, 99, msg_scope);
 
-	   std::shared_ptr<RubyRequest> msg = std::make_shared<RubyRequest>(
-	     clockEdge(), addr, (uint8_t*) 0, 0, 0,
-		 RubyRequestType_FLUSH, RubyAccessMode_Supervisor,
-		 nullptr);
+	  assert(m_mandatory_q_ptr != NULL);
+	  m_mandatory_q_ptr->enqueue(msg, clockEdge(), m_data_cache_hit_latency);
 
+	  DPRINTF(SFIFO, "Exiting wbL1\n");
 
-    int size = m_dataCache_ptr->getNumBlocks();
-    DPRINTF(GPUCoalescer,
-            "There are %d Writebacks outstanding before Cache Walk\n",
-            m_outstanding_wb);
-    // Walk the cache
-    for (int i = 0; i < size; i++) {
-        Addr addr = m_dataCache_ptr->getAddressAtIdx(i);
-        // Write dirty data back
-        std::shared_ptr<RubyRequest> msg = std::make_shared<RubyRequest>(
-            clockEdge(), addr, (uint8_t*) 0, 0, 0,
-            RubyRequestType_Sfifo_Release, RubyAccessMode_Supervisor,
-            nullptr);
-        assert(m_mandatory_q_ptr != NULL);
-        m_mandatory_q_ptr->enqueue(msg, clockEdge(), m_data_cache_hit_latency);
-        m_outstanding_wb++;
-    }
-    DPRINTF(GPUCoalescer,
-            "There are %d Writebacks outstanding after Cache Walk\n",
-            m_outstanding_wb);
-            */
+	#else
+	  // Cache walk
+		int size = m_dataCache_ptr->getNumBlocks();
+		DPRINTF(GPUCoalescer,
+				"There are %d Writebacks outstanding before Cache Walk\n",
+				m_outstanding_wb);
+		// Walk the cache
+		for (int i = 0; i < size; i++) {
+			Addr addr = m_dataCache_ptr->getAddressAtIdx(i);
+			// Write dirty data back
+			std::shared_ptr<RubyRequest> msg = std::make_shared<RubyRequest>(
+				clockEdge(), addr, (uint8_t*) 0, 0, 0,
+				RubyRequestType_FLUSH, RubyAccessMode_Supervisor,
+				nullptr);
+			assert(m_mandatory_q_ptr != NULL);
+			m_mandatory_q_ptr->enqueue(msg, clockEdge(), m_data_cache_hit_latency);
+			m_outstanding_wb++;
+		}
+		DPRINTF(GPUCoalescer,
+				"There are %d Writebacks outstanding after Cache Walk\n",
+				m_outstanding_wb);
+	#endif
 }
 
 /**
@@ -337,26 +337,33 @@ VIPERCoalescer::invwbL1(HSAScope msg_scope, uint64_t msg_addr)
         m_mandatory_q_ptr->enqueue(msg, clockEdge(), m_data_cache_hit_latency);
         m_outstanding_inv++;
     }
-	DPRINTF(SFIFO,
-            "Inside invwbL1, making request with msg addr = %d\n", msg_addr);
-    std::shared_ptr<RubyRequest> msg = std::make_shared<RubyRequest>(
-            clockEdge(), msg_addr, (uint8_t*) 0, 0, 0,
-            RubyRequestType_Sfifo_Release, RubyAccessMode_Supervisor,
-            nullptr, PrefetchBit_No, 100, 99, msg_scope);
-    assert(m_mandatory_q_ptr != NULL);
-    m_mandatory_q_ptr->enqueue(msg, clockEdge(), m_data_cache_hit_latency);
-	DPRINTF(SFIFO, "Exiting invwbL1\n");
-    // Walk the cache
-//    
-//  for (int i = 0; i< size; i++) {
-//      Addr addr = m_dataCache_ptr->getAddressAtIdx(i);
-//      // Write dirty data back
-//      std::shared_ptr<RubyRequest> msg = std::make_shared<RubyRequest>(
-//          clockEdge(), addr, (uint8_t*) 0, 0, 0,
-//          RubyRequestType_FLUSH, RubyAccessMode_Supervisor,
-//          nullptr);
-//      assert(m_mandatory_q_ptr != NULL);
-//      m_mandatory_q_ptr->enqueue(msg, clockEdge(), m_data_cache_hit_latency);
-//      m_outstanding_wb++;
-//  }
+
+	#ifdef USE_SFIFO
+
+	  DPRINTF(SFIFO,
+			  "Inside invwbL1, making request with msg addr = %d\n", msg_addr);
+	  std::shared_ptr<RubyRequest> msg = std::make_shared<RubyRequest>(
+			  clockEdge(), msg_addr, (uint8_t*) 0, 0, 0,
+			  RubyRequestType_Sfifo_Release, RubyAccessMode_Supervisor,
+			  nullptr, PrefetchBit_No, 100, 99, msg_scope);
+	  assert(m_mandatory_q_ptr != NULL);
+	  m_mandatory_q_ptr->enqueue(msg, clockEdge(), m_data_cache_hit_latency);
+	  DPRINTF(SFIFO, "Exiting invwbL1\n");
+
+	#else
+
+		// Walk the cache
+			
+	  for (int i = 0; i< size; i++) {
+		  Addr addr = m_dataCache_ptr->getAddressAtIdx(i);
+		  // Write dirty data back
+		  std::shared_ptr<RubyRequest> msg = std::make_shared<RubyRequest>(
+			  clockEdge(), addr, (uint8_t*) 0, 0, 0,
+			  RubyRequestType_FLUSH, RubyAccessMode_Supervisor,
+			  nullptr);
+		  assert(m_mandatory_q_ptr != NULL);
+		  m_mandatory_q_ptr->enqueue(msg, clockEdge(), m_data_cache_hit_latency);
+		  m_outstanding_wb++;
+	  }
+	#endif
 }

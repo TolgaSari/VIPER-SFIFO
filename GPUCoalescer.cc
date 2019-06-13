@@ -660,7 +660,7 @@ GPUCoalescer::hitCallback(GPUCoalescerRequest* srequest,
         // Note: RubyPort will access it's sender state before the
         // RubyTester.
         if (m_usingRubyTester) {
-			DPRINTF(SFIFO, "in hit callback\n");
+//	DPRINTF(SFIFO, "in hit callback\n");
             RubyPort::SenderState *requestSenderState =
                 safe_cast<RubyPort::SenderState*>(pkt->senderState);
             RubyTester::SenderState* testerSenderState =
@@ -677,7 +677,7 @@ GPUCoalescer::hitCallback(GPUCoalescerRequest* srequest,
 
 
     completeHitCallback(mylist, len);
-	DPRINTF(SFIFO, "out hit callback\n");
+//PRINTF(SFIFO, "out hit callback\n");
 }
 
 bool
@@ -1192,7 +1192,7 @@ GPUCoalescer::recordCPWriteCallBack(MachineID myMachID, MachineID senderMachID)
 void
 GPUCoalescer::completeHitCallback(std::vector<PacketPtr> & mylist, int len)
 {
-	DPRINTF(SFIFO, "in completeHitCallback\n");
+//PRINTF(SFIFO, "in completeHitCallback\n");
     for (int i = 0; i < len; ++i) {
         RubyPort::SenderState *ss =
             safe_cast<RubyPort::SenderState *>(mylist[i]->senderState);
@@ -1206,7 +1206,7 @@ GPUCoalescer::completeHitCallback(std::vector<PacketPtr> & mylist, int len)
     }
 
     testDrainComplete();
-	DPRINTF(SFIFO, "out completeHitCallback\n");
+//PRINTF(SFIFO, "out completeHitCallback\n");
 }
 
 PacketPtr

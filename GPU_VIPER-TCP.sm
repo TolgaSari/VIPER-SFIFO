@@ -309,6 +309,7 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
     {
         if(releaseBuffer_in.isReady(clockEdge()))
         {
+			assert(!(mRelFIFO.isEmpty()));
             peek(releaseBuffer_in, TriggerMsg) // block_on ?
             {       
 				DPRINTF(SFIFO, "%s\n", in_msg);
@@ -322,7 +323,7 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
 				if(in_msg.Type == TriggerType:Sfifo_Release)
 				{
 					trigger(Event:SfifoRelease, mRelFIFO.front(), cache_entry, tbe);
-					DPRINTF(SFIFO, "triggering SfifoRelease\n");
+					DPRINTF(SFIFO, "releaseBuffer triggering SfifoRelease\n");
 				}
             }
         } 
@@ -571,7 +572,7 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
         releaseBuffer_in.dequeue(clockEdge());
         if(releaseBuffer_in.isEmpty())
 		{
-		DPRINTF(SFIFO, "reset first_flush\n");
+			DPRINTF(SFIFO, "reset first_flush\n");
 			first_flush := true;
 		}
     }   
