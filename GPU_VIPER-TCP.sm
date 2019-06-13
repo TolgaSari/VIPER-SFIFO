@@ -589,14 +589,14 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
     if(!mRelFIFO.isFull())
     {
         mRelFIFO.enq(address);
-        DPRINTF(SFIFO, "SFIFO enqueue addr %#x!\n", address);
+//      DPRINTF(SFIFO, "SFIFO enqueue addr %#x!\n", address);
     }
     else
     {
         DPRINTF(SFIFO, "SFIFO full poping Sfifo\n");
         forceFlushAddr := mRelFIFO.deque();
-        DPRINTF(SFIFO, "SFIFO full => force flush addr %#x!\n", forceFlushAddr);
-        // 
+//      DPRINTF(SFIFO, "SFIFO full => force flush addr %#x!\n", forceFlushAddr);
+       
         WTcnt := WTcnt + 1;
         APPEND_TRANSITION_COMMENT("write++ = ");
         APPEND_TRANSITION_COMMENT(WTcnt);
@@ -615,7 +615,7 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
             out_msg.Shared := false;
 
         mRelFIFO.enq(address);
-        DPRINTF(SFIFO, "SFIFO enqueue addr %#x!\n", address);
+//      DPRINTF(SFIFO, "SFIFO enqueue addr %#x!\n", address);
         }
         // Pop and flush
     }
