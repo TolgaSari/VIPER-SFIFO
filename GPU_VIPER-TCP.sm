@@ -538,7 +538,7 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
     if(!mRelFIFO.isEmpty())
     {
 		DPRINTF(SFIFO, "in echoSfifoRelease, enqueue addr %d\n", address);
-      enqueue(releaseBuffer_out, TriggerMsg, 1) {
+		enqueue(releaseBuffer_out, TriggerMsg, 1) {
         out_msg.addr := address;
         out_msg.Type := TriggerType:Sfifo_Release; // Fix this
       }
@@ -554,7 +554,7 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
   action(psf_popSfifo, "psf", desc="echo Sfifo Releases")
   {
 	DPRINTF(SFIFO, "in psf\n");
-    if(!mRelFIFO.isEmpty() && !firstPop)
+    if(!firstPop)
     {
 		DPRINTF(SFIFO, "in popSfifo not first pop\n");
         mRelFIFO.deque();
@@ -592,6 +592,7 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
     }
     else
     {
+        DPRINTF(SFIFO, "SFIFO full poping Sfifo\n");
         forceFlushAddr := mRelFIFO.deque();
         DPRINTF(SFIFO, "SFIFO full => force flush addr %#x!\n", forceFlushAddr);
         // 
