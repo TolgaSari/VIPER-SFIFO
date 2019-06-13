@@ -42,6 +42,7 @@ inline void Sfifo<Addr>::enq(Addr input)
 	DPRINTF(SFIFO, "Sfifo enqueue, tail = %d, addr = %#x\n", tail, input);
     fifo[tail++] = input;
     tail = tail % depth;
+	is_empty = false;
     is_full = (head == tail);
 }
 
@@ -52,6 +53,7 @@ inline Addr Sfifo<Addr>::deque()
     Addr retval = fifo[head++];
     head = head % depth;
 	DPRINTF(SFIFO, "Sfifo deque, head = %d, retval = %#x\n", head, retval);
+	is_full = false;
     is_empty = (head == tail);
     return retval;
 }

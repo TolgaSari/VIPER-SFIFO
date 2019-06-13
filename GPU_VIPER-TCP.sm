@@ -129,7 +129,7 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
   }
 
   // Tolga Start
-    Sfifo mRelFIFO, template="<Addr>", constructor="8";
+    Sfifo mRelFIFO, template="<Addr>", constructor="4";
   // Tolga End
   TBETable TBEs, template="<TCP_TBE>", constructor="m_number_of_TBEs";
   int TCC_select_low_bit, default="RubySystem::getBlockSizeBits()";
@@ -612,6 +612,9 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
             out_msg.Type := CoherenceRequestType:WriteThrough;
             out_msg.InitialRequestTime := curCycle();
             out_msg.Shared := false;
+
+        mRelFIFO.enq(address);
+        DPRINTF(SFIFO, "SFIFO enqueue addr %#x!\n", address);
         }
         // Pop and flush
     }
