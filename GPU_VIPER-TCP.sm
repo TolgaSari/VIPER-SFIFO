@@ -552,7 +552,7 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
   }
 
   // Tolga 
-  action(psf_popSfifo, "psf", desc="echo Sfifo Releases")
+  action(psf_popSfifo, "psf", desc="pop SFIFO")
   {
 	DPRINTF(SFIFO, "in psf\n");
     if(!firstPop)
@@ -627,31 +627,7 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
     }
     cache_entry.Dirty := true;
   }
-/* Fancy Flush Code - Where to Put?
-while(!mRelFifo.isEmpty)
-{
-    forceFlushAddr := mRelFIFO.deque();
-    DPRINTF(RubySlicc, "SFIFO full => force flush addr %d!\n", printfAddress(forceFlushAddr));
-    
-    WTcnt := WTcnt + 1;
-    APPEND_TRANSITION_COMMENT("write++ = ");
-    APPEND_TRANSITION_COMMENT(WTcnt);
-    enqueue(requestNetwork_out, CPURequestMsg, issue_latency) {
-    out_msg.addr := forceFlushAddr;
-    out_msg.Requestor := machineID;
-    assert(is_valid(cache_entry));
-    out_msg.DataBlk := cache_entry.DataBlk;
-    out_msg.writeMask.clear();
-    out_msg.writeMask.orMask(cache_entry.writeMask);
-    out_msg.Destination.add(mapAddressToRange(forceFlushAddr,MachineType:TCC,
-                          TCC_select_low_bit, TCC_select_num_bits));
-    out_msg.MessageSize := MessageSizeType:Data;
-    out_msg.Type := CoherenceRequestType:WriteThrough;
-    out_msg.InitialRequestTime := curCycle();
-    out_msg.Shared := false;
-    
-}
-   */
+
   action(inv_invDone, "inv", desc="local inv done") {
     if (use_seq_not_coal) {
         DPRINTF(RubySlicc, "Sequencer does not define invCallback!\n");
