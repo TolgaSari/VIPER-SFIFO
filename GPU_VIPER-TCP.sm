@@ -537,7 +537,7 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
   {
     if(!mRelFIFO.isEmpty())
     {
-		DPRINTF(SFIFO, "in echoSfifoRelease, enqueue addr %d\n", address);
+		DPRINTF(SFIFO, "echoSfifoRelease - enqueue addr %d\n", address);
 		enqueue(releaseBuffer_out, TriggerMsg, 1) {
         out_msg.addr := address;
         out_msg.Type := TriggerType:Sfifo_Release; // Fix this
@@ -545,7 +545,7 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
     }
     else
     {
-		DPRINTF(SFIFO, "in first echoSfifoRelease\n");
+		DPRINTF(SFIFO, "echoSfifoRelease - first call\n");
 		blockMq := false;
     }
   }
@@ -553,15 +553,15 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
   // Tolga 
   action(psf_popSfifo, "psf", desc="pop SFIFO")
   {
-	DPRINTF(SFIFO, "in psf\n");
     if(!firstPop)
     {
-		DPRINTF(SFIFO, "in popSfifo not first pop\n");
+		DPRINTF(SFIFO, "popSfifo - not first pop\n");
         mRelFIFO.deque();
 		firstPop := false;
     }
 	else
 	{
+		DPRINTF(SFIFO, "popSfifo - first pop\n");
 		mandatoryQueue_in.dequeue(clockEdge());
 		blockMq := true;
 		firstPop := true;
@@ -570,10 +570,9 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
   // Tolga
   action(prb_popReleaseBuffer, "prb", desc="Pop Release Buffer") 
   {
-	DPRINTF(SFIFO, "in popReleaseBuffer\n");
     if(!first_flush)
     {
-		DPRINTF(SFIFO, "pop release buffer not first_flush\n");
+		DPRINTF(SFIFO, "popReleaseBuffer - not first_flush\n");
         releaseBuffer_in.dequeue(clockEdge());
         if(releaseBuffer_in.isEmpty())
 		{
@@ -583,7 +582,7 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
     }   
     else
     {
-		DPRINTF(SFIFO, "setting first_flush\n");
+		DPRINTF(SFIFO, "popReleaseBuffer - setting first_flush\n");
 		first_flush := false; 
     }
   }
