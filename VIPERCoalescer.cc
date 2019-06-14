@@ -156,11 +156,14 @@ VIPERCoalescer::makeRequest(PacketPtr pkt)
 
         insertKernel(pkt->req->contextId(), pkt);
         wbL1(reqScopeToHSAScope(pkt->req), pkt->req->getPaddr());// Tolga - modification
+		DPRINTF(SFIFO, "after wbL1 isKernel + isRelease\n");
         if (m_outstanding_wb == 0) {
             for (auto it =  kernelEndList.begin(); it != kernelEndList.end(); it++) {
                 newKernelEnds.push_back(it->first);
             }
+			DPRINTF(SFIFO, "it can get here\n");
             completeIssue();
+			DPRINTF(SFIFO, "it cant get here\n");
         }
         return RequestStatus_Issued;
     }
@@ -193,6 +196,7 @@ VIPERCoalescer::makeRequest(PacketPtr pkt)
         // Flush the L1 cache
         inc_counter(false, accessScope);
         wbL1(reqScopeToHSAScope(pkt->req), pkt->req->getPaddr());
+		DPRINTF(SFIFO, "after wbL1 flush L1 cache\n");
         if (m_outstanding_wb > 0 && issueEvent.scheduled()) {
             DPRINTF(GPUCoalescer, "issueEvent Descheduled\n");
             deschedule(issueEvent);
@@ -291,7 +295,7 @@ VIPERCoalescer::wbL1(HSAScope msg_scope, uint64_t msg_addr)// Tolga - modificati
 
 	  assert(m_mandatory_q_ptr != NULL);
 	  m_mandatory_q_ptr->enqueue(msg, clockEdge(), m_data_cache_hit_latency);
-
+	  m_outstanding_wb+= 4;
 	  DPRINTF(SFIFO, "Exiting wbL1\n");
 
 	#else
@@ -348,6 +352,7 @@ VIPERCoalescer::invwbL1(HSAScope msg_scope, uint64_t msg_addr)
 			  nullptr, PrefetchBit_No, 100, 99, msg_scope);
 	  assert(m_mandatory_q_ptr != NULL);
 	  m_mandatory_q_ptr->enqueue(msg, clockEdge(), m_data_cache_hit_latency);
+	  m_outstanding_wb+= 4;
 	  DPRINTF(SFIFO, "Exiting invwbL1\n");
 
 	#else
