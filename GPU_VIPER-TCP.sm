@@ -129,7 +129,7 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
   }
 
   // Tolga Start
-    Sfifo mRelFIFO, template="<Addr>", constructor="4";
+  Sfifo mRelFIFO, template="<Addr>", constructor="4";
   // Tolga End
   TBETable TBEs, template="<TCP_TBE>", constructor="m_number_of_TBEs";
   int TCC_select_low_bit, default="RubySystem::getBlockSizeBits()";
@@ -331,7 +331,8 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
   in_port(mandatoryQueue_in, RubyRequest, mandatoryQueue, desc="...") {
     if (mandatoryQueue_in.isReady(clockEdge())) { // Tolga
       peek(mandatoryQueue_in, RubyRequest, block_on="LineAddress") {
-		  //DPRINTF(SFIFO, "blockMq = %d, WTcnt = %d, if = %d\n", blockMq, WTcnt,!blockMq && (WTcnt != 0));
+//DPRINTF(SFIFO, "%s\n", in_msg);
+// DPRINTF(SFIFO, "blockMq = %d, WTcnt = %d, if = %d\n", blockMq, WTcnt,!blockMq && (WTcnt != 0));
         if(!blockMq && (WTcnt == 0))
         {
             Entry cache_entry := getCacheEntry(in_msg.LineAddress);
@@ -363,10 +364,8 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
             } else if (in_msg.Type == RubyRequestType:REPLACEMENT){
                 trigger(Event:Evict, in_msg.LineAddress, cache_entry, tbe);
             } else if (in_msg.Type == RubyRequestType:Sfifo_Release) { // Tolga
-                trigger(Event:SfifoRelease, in_msg.LineAddress, cache_entry, tbe);
-				blockMq := true;
-				firstPop := true;
 				DPRINTF(SFIFO, "First SfifoRelease from mandatory queue\n");
+                trigger(Event:SfifoRelease, in_msg.LineAddress, cache_entry, tbe);
             } else {
               error("Unexpected Request Message from VIC");
               if (is_valid(cache_entry) || L1cache.cacheAvail(in_msg.LineAddress)) {
@@ -561,6 +560,12 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
         mRelFIFO.deque();
 		firstPop := false;
     }
+	else
+	{
+		mandatoryQueue_in.dequeue(clockEdge());
+		blockMq := true;
+		firstPop := true;
+	}
   }
   // Tolga
   action(prb_popReleaseBuffer, "prb", desc="Pop Release Buffer") 
@@ -585,6 +590,13 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
 
   action(s_storeDone, "s", desc="local store done") {
     assert(is_valid(cache_entry));
+   if (use_seq_not_coal) {
+      sequencer.writeCallback(address, cache_entry.DataBlk, false, MachineType:L1Cache);
+    } else {
+      coalescer.writeCallback(address, MachineType:L1Cache, cache_entry.DataBlk);
+    }
+    cache_entry.Dirty := true;
+
     // Tolga Start
     if(!mRelFIFO.isFull())
     {
@@ -620,12 +632,7 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
         // Pop and flush
     }
     // Tolga End
-    if (use_seq_not_coal) {
-      sequencer.writeCallback(address, cache_entry.DataBlk, false, MachineType:L1Cache);
-    } else {
-      coalescer.writeCallback(address, MachineType:L1Cache, cache_entry.DataBlk);
-    }
-    cache_entry.Dirty := true;
+ 
   }
 
   action(inv_invDone, "inv", desc="local inv done") {
@@ -897,13 +904,15 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
     transition({V, I}, SfifoRelease)
     {
         esf_echoSfifoRelease;
+		psf_popSfifo;
         prb_popReleaseBuffer;    
     }
 
     transition({M, W}, SfifoRelease)
     {
         esf_echoSfifoRelease;
-        wb_wbDone;
+		wt_writeThrough;
+		psf_popSfifo;
         prb_popReleaseBuffer;    
     }
 
