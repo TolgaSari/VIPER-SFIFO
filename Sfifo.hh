@@ -61,7 +61,7 @@ inline Addr Sfifo<Addr>::deque()
 template<class Addr>
 inline Addr Sfifo<Addr>::front()
 {
-    assert(is_empty);
+    assert(!is_empty);
     Addr retval = fifo[head];
 	DPRINTF(SFIFO, "Sfifo front, head = %d, retval = %#x\n", head, retval);
     return retval;
