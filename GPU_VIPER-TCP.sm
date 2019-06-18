@@ -537,9 +537,9 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
   {
     if(!mRelFIFO.isEmpty())
     {
-		DPRINTF(SFIFO, "echoSfifoRelease - enqueue addr %d\n", address);
+		DPRINTF(SFIFO, "echoSfifoRelease - enqueue addr %#x\n", mRelFIFO.front());
 		enqueue(releaseBuffer_out, TriggerMsg, 1) {
-        out_msg.addr := address;
+        out_msg.addr := mRelFIFO.front();
         out_msg.Type := TriggerType:Sfifo_Release; // Fix this
       }
     }
@@ -555,7 +555,7 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
   {
     if(!firstPop)
     {
-		DPRINTF(SFIFO, "popSfifo - not first pop\n");
+		DPRINTF(SFIFO, "popSfifo\n");
         mRelFIFO.deque();
 		firstPop := false;
     }
@@ -572,9 +572,9 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
   {
     if(!first_flush)
     {
-		DPRINTF(SFIFO, "popReleaseBuffer - not first_flush\n");
-        releaseBuffer_in.dequeue(clockEdge());
-        if(releaseBuffer_in.isEmpty())
+		DPRINTF(SFIFO, "popReleaseBuffer\n");
+		releaseBuffer_in.dequeue(clockEdge());
+		if(releaseBuffer_in.isEmpty())
 		{
 			DPRINTF(SFIFO, "reset first_flush\n");
 			first_flush := true;
