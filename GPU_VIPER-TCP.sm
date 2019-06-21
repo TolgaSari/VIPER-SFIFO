@@ -135,9 +135,8 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
   int TCC_select_low_bit, default="RubySystem::getBlockSizeBits()";
   int WTcnt, default="0";
   int Fcnt, default="0";
-  bool first_flush, default="true"; // Tolga
+  bool first_esf, default="true"; // Tolga
   bool blockMq, default="false"; // Tolga
-  bool firstPop, default="false"; // Tolga
   Addr forceFlushAddr; // Tolga
   bool inFlush, default="false";
 
@@ -309,21 +308,21 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
     {
         if(releaseBuffer_in.isReady(clockEdge()))
         {
-			assert(!(mRelFIFO.isEmpty()));
+//	assert(!(mRelFIFO.isEmpty()));
             peek(releaseBuffer_in, TriggerMsg) // block_on ?
             {       
 				DPRINTF(SFIFO, "%s\n", in_msg);
-                TBE tbe := TBEs.lookup(mRelFIFO.front());
-                Entry cache_entry := getCacheEntry(mRelFIFO.front());
+                TBE tbe := TBEs.lookup(in_msg.addr);
+                Entry cache_entry := getCacheEntry(in_msg.addr);
 
 				//assert(tbe != NULL);
-				assert(is_valid(cache_entry));
+				//assert(is_valid(cache_entry));
 				//if(tbe.numAtomics == 0)
 				 
 				if(in_msg.Type == TriggerType:Sfifo_Release)
 				{
-					trigger(Event:SfifoRelease, mRelFIFO.front(), cache_entry, tbe);
-					DPRINTF(SFIFO, "releaseBuffer triggering SfifoRelease\n");
+					trigger(Event:SfifoRelease, in_msg.addr, cache_entry, tbe);
+					DPRINTF(SFIFO, "releaseBuffer -	triggering SfifoRelease\n");
 				}
             }
         } 
@@ -331,8 +330,8 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
   in_port(mandatoryQueue_in, RubyRequest, mandatoryQueue, desc="...") {
     if (mandatoryQueue_in.isReady(clockEdge())) { // Tolga
       peek(mandatoryQueue_in, RubyRequest, block_on="LineAddress") {
-//DPRINTF(SFIFO, "%s\n", in_msg);
-// DPRINTF(SFIFO, "blockMq = %d, WTcnt = %d, if = %d\n", blockMq, WTcnt,!blockMq && (WTcnt != 0));
+		//DPRINTF(SFIFO, "%s\n", in_msg);
+		//DPRINTF(SFIFO, "blockMq = %d, WTcnt = %d, if = %d\n", blockMq, WTcnt,!blockMq && (WTcnt != 0));
         if(!blockMq && (WTcnt == 0))
         {
             Entry cache_entry := getCacheEntry(in_msg.LineAddress);
@@ -538,52 +537,51 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
     if(!mRelFIFO.isEmpty())
     {
 		DPRINTF(SFIFO, "echoSfifoRelease - enqueue addr %#x\n", mRelFIFO.front());
-		enqueue(releaseBuffer_out, TriggerMsg, 1) {
-        out_msg.addr := mRelFIFO.front();
-        out_msg.Type := TriggerType:Sfifo_Release; // Fix this
-      }
+		enqueue(releaseBuffer_out, TriggerMsg, 1)
+		{
+			out_msg.addr := mRelFIFO.front();
+			out_msg.Type := TriggerType:Sfifo_Release; // Fix this
+		}
     }
-    else
+	else
     {
-		DPRINTF(SFIFO, "echoSfifoRelease - first call\n");
-		blockMq := false;
+		DPRINTF(SFIFO, "echoSfifoRelease - Last Call\n");
     }
   }
 
   // Tolga 
   action(psf_popSfifo, "psf", desc="pop SFIFO")
   {
-    if(!firstPop)
+    if(first_esf)
     {
-		DPRINTF(SFIFO, "popSfifo\n");
-        mRelFIFO.deque();
-		firstPop := false;
+		DPRINTF(SFIFO, "popSfifo - first call, first_esf => false\n");
+		blockMq := true;
+		first_esf:= false;
     }
+	if(mRelFIFO.isEmpty())
+	{
+		DPRINTF(SFIFO, "popSfifo - last call\n");
+		blockMq := false;
+		first_esf := true;
+	}
 	else
 	{
-		DPRINTF(SFIFO, "popSfifo - first pop\n");
-		mandatoryQueue_in.dequeue(clockEdge());
-		blockMq := true;
-		firstPop := true;
-	}
+		DPRINTF(SFIFO, "popSfifo - popping SFIFO\n");
+		mRelFIFO.deque();
+	}	
   }
   // Tolga
   action(prb_popReleaseBuffer, "prb", desc="Pop Release Buffer") 
   {
-    if(!first_flush)
+    if(first_esf)
     {
-		DPRINTF(SFIFO, "popReleaseBuffer\n");
-		releaseBuffer_in.dequeue(clockEdge());
-		if(releaseBuffer_in.isEmpty())
-		{
-			DPRINTF(SFIFO, "reset first_flush\n");
-			first_flush := true;
-		}
+		mandatoryQueue_in.dequeue(clockEdge());
+		DPRINTF(SFIFO, "popReleaseBuffer - first call, popping mandatoryQ\n");
     }   
     else
     {
-		DPRINTF(SFIFO, "popReleaseBuffer - setting first_flush\n");
-		first_flush := false; 
+		DPRINTF(SFIFO, "popReleaseBuffer popping releaseBuffer\n");
+		releaseBuffer_in.dequeue(clockEdge());
     }
   }
 
@@ -600,13 +598,13 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
     if(!mRelFIFO.isFull())
     {
         mRelFIFO.enq(address);
-//      DPRINTF(SFIFO, "SFIFO enqueue addr %#x!\n", address);
+        DPRINTF(SFIFO, "SFIFO enqueue addr %#x!\n", address);
     }
     else
     {
-        DPRINTF(SFIFO, "SFIFO full poping Sfifo\n");
+        //DPRINTF(SFIFO, "SFIFO full poping Sfifo\n");
         forceFlushAddr := mRelFIFO.deque();
-//      DPRINTF(SFIFO, "SFIFO full => force flush addr %#x!\n", forceFlushAddr);
+        DPRINTF(SFIFO, "SFIFO full => force flush addr %#x!\n", forceFlushAddr);
        
         WTcnt := WTcnt + 1;
         APPEND_TRANSITION_COMMENT("write++ = ");
@@ -626,7 +624,7 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
             out_msg.Shared := false;
 
         mRelFIFO.enq(address);
-//      DPRINTF(SFIFO, "SFIFO enqueue addr %#x!\n", address);
+        DPRINTF(SFIFO, "SFIFO enqueue addr %#x!\n", address);
         }
         // Pop and flush
     }
@@ -667,14 +665,15 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
     //if (inFlush == true) {
       //Fcnt := Fcnt -1;
     //}
-    if(WTcnt > 0) 
+	if(WTcnt > 0) 
 	{
 		blockMq := blockMq;
-	}
+	}	
 	else 
-	{ 
+	{
 		blockMq := false;
-	} // Tolga
+	}
+	 // Tolga
     assert(WTcnt >= 0);
     APPEND_TRANSITION_COMMENT("write-- = ");
     APPEND_TRANSITION_COMMENT(WTcnt);
@@ -903,16 +902,16 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
     transition({V, I}, SfifoRelease)
     {
         esf_echoSfifoRelease;
-		psf_popSfifo;
         prb_popReleaseBuffer;    
+		psf_popSfifo;
     }
 
     transition({M, W}, SfifoRelease)
     {
         esf_echoSfifoRelease;
 		wt_writeThrough;
-		psf_popSfifo;
         prb_popReleaseBuffer;    
+		psf_popSfifo;
     }
 
 }
