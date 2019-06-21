@@ -39,7 +39,7 @@ template<class Addr>
 inline void Sfifo<Addr>::enq(Addr input)
 {
     assert(!is_full);
-	DPRINTF(SFIFO, "Sfifo enqueue, tail = %d, addr = %#x\n", tail, input);
+	//DPRINTF(SFIFO, "Sfifo enqueue, tail = %d, addr = %#x\n", tail, input);
     fifo[tail++] = input;
     tail = tail % depth;
 	is_empty = false;
@@ -52,7 +52,7 @@ inline Addr Sfifo<Addr>::deque()
     assert(!is_empty);
     Addr retval = fifo[head++];
     head = head % depth;
-	DPRINTF(SFIFO, "Sfifo deque, head = %d, retval = %#x\n", head, retval);
+	//DPRINTF(SFIFO, "Sfifo deque, head = %d, retval = %#x\n", head, retval);
 	is_full = false;
     is_empty = (head == tail);
     return retval;
@@ -63,7 +63,7 @@ inline Addr Sfifo<Addr>::front()
 {
     assert(!is_empty);
     Addr retval = fifo[head];
-	DPRINTF(SFIFO, "Sfifo front, head = %d, retval = %#x\n", head, retval);
+	//DPRINTF(SFIFO, "Sfifo front, head = %d, retval = %#x\n", head, retval);
     return retval;
 }
 #endif 
