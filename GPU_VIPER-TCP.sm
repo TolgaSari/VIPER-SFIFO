@@ -308,16 +308,11 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
     {
         if(releaseBuffer_in.isReady(clockEdge()))
         {
-//	assert(!(mRelFIFO.isEmpty()));
             peek(releaseBuffer_in, TriggerMsg) // block_on ?
             {       
 				DPRINTF(SFIFO, "%s\n", in_msg);
                 TBE tbe := TBEs.lookup(in_msg.addr);
                 Entry cache_entry := getCacheEntry(in_msg.addr);
-
-				//assert(tbe != NULL);
-				//assert(is_valid(cache_entry));
-				//if(tbe.numAtomics == 0)
 				 
 				if(in_msg.Type == TriggerType:Sfifo_Release)
 				{
@@ -545,7 +540,7 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
     }
 	else
     {
-		DPRINTF(SFIFO, "echoSfifoRelease - Last Call\n");
+		DPRINTF(SFIFO, "echoSfifoRelease - SFIFO is empty\n");
     }
   }
 
@@ -560,7 +555,7 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
     }
 	if(mRelFIFO.isEmpty())
 	{
-		DPRINTF(SFIFO, "popSfifo - last call\n");
+		DPRINTF(SFIFO, "popSfifo - SFIFO is empty\n");
 		blockMq := false;
 		first_esf := true;
 	}
@@ -907,7 +902,7 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
 		psf_popSfifo;
     }
 
-    transition({M, W}, SfifoRelease)
+    transition({M, W}, SfifoRelease, V)
     {
 		wt_writeThrough;
 		ic_invCache;
