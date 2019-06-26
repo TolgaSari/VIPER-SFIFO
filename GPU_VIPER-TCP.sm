@@ -129,7 +129,7 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
   }
 
   // Tolga Start
-  Sfifo mRelFIFO, template="<Addr>", constructor="4";
+  Sfifo mRelFIFO, template="<Addr>", constructor="8";
   // Tolga End
   TBETable TBEs, template="<TCP_TBE>", constructor="m_number_of_TBEs";
   int TCC_select_low_bit, default="RubySystem::getBlockSizeBits()";
@@ -901,6 +901,7 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
     // Tolga
     transition({V, I}, SfifoRelease)
     {
+		wb_wbDone;	
         esf_echoSfifoRelease;
         prb_popReleaseBuffer;    
 		psf_popSfifo;
@@ -908,8 +909,9 @@ machine(MachineType:TCP, "GPU TCP (L1 Data Cache)")
 
     transition({M, W}, SfifoRelease)
     {
-        esf_echoSfifoRelease;
 		wt_writeThrough;
+		ic_invCache;
+        esf_echoSfifoRelease;
         prb_popReleaseBuffer;    
 		psf_popSfifo;
     }
