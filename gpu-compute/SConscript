@@ -98,4 +98,4 @@ DebugFlag('Predictor')
 DebugFlag('WavefrontStack')
 
 CompoundFlag('GPUALL', ['GPUCoalescer', 'GPUDisp', 'GPUExec', 'GPUFetch',
-                        'GPUMem', 'GPUPort', 'GPUSync', 'GPUTLB', 'HSAIL'])
+                        'GPUMem', 'GPUPort', 'GPUSync', 'GPUTLB', 'HSAIL', 'SFIFO'])
