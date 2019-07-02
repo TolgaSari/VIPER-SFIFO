@@ -33,6 +33,8 @@
  * Author: Sooraj Puthoor
  */
 
+#define USE_SFIFO // Tolga
+
 #include "base/misc.hh"
 #include "base/str.hh"
 #include "config/the_isa.hh"
@@ -66,12 +68,13 @@ VIPERCoalescerParams::create()
 }
 
 VIPERCoalescer::VIPERCoalescer(const Params *p)
-    : GPUCoalescer(p)
+    : GPUCoalescer(p), coalFifo(Sfifo<Addr>(8))
 {
     m_max_wb_per_cycle=p->max_wb_per_cycle;
     m_max_inv_per_cycle=p->max_inv_per_cycle;
     m_outstanding_inv = 0;
     m_outstanding_wb = 0;
+	//coalFifo = Sfifo<Addr>(8);
 }
 
 VIPERCoalescer::~VIPERCoalescer()
@@ -237,6 +240,7 @@ VIPERCoalescer::wbL1()
             "There are %d Writebacks outstanding before Cache Walk\n",
             m_outstanding_wb);
     // Walk the cache
+	#ifndef USE_SFIFO	
     for (int i = 0; i < size; i++) {
         Addr addr = m_dataCache_ptr->getAddressAtIdx(i);
         // Write dirty data back
@@ -248,6 +252,20 @@ VIPERCoalescer::wbL1()
         m_mandatory_q_ptr->enqueue(msg, clockEdge(), m_data_cache_hit_latency);
         m_outstanding_wb++;
     }
+	#else
+    while(!coalFifo.isEmpty()){
+        Addr addr = coalFifo.deque();
+		DPRINTF(SFIFO, "FLUSHING => Addr = %#x\n", addr);
+        // Write dirty data back
+        std::shared_ptr<RubyRequest> msg = std::make_shared<RubyRequest>(
+            clockEdge(), addr, (uint8_t*) 0, 0, 0,
+            RubyRequestType_FLUSH, RubyAccessMode_Supervisor,
+            nullptr);
+        assert(m_mandatory_q_ptr != NULL);
+        m_mandatory_q_ptr->enqueue(msg, clockEdge(), m_data_cache_hit_latency);
+        m_outstanding_wb++;
+    }
+	#endif
     DPRINTF(GPUCoalescer,
             "There are %d Writebacks outstanding after Cache Walk\n",
             m_outstanding_wb);
@@ -272,8 +290,9 @@ VIPERCoalescer::invwbL1()
         m_mandatory_q_ptr->enqueue(msg, clockEdge(), m_data_cache_hit_latency);
         m_outstanding_inv++;
     }
-    // Walk the cache
-    for (int i = 0; i< size; i++) {
+
+	#ifndef USE_SFIFO	
+    for (int i = 0; i < size; i++) {
         Addr addr = m_dataCache_ptr->getAddressAtIdx(i);
         // Write dirty data back
         std::shared_ptr<RubyRequest> msg = std::make_shared<RubyRequest>(
@@ -284,4 +303,30 @@ VIPERCoalescer::invwbL1()
         m_mandatory_q_ptr->enqueue(msg, clockEdge(), m_data_cache_hit_latency);
         m_outstanding_wb++;
     }
+	#else
+    while(!coalFifo.isEmpty()){
+        Addr addr = coalFifo.deque();
+		DPRINTF(SFIFO, "FLUSHING => Addr = %#x\n", addr);
+        // Write dirty data back
+        std::shared_ptr<RubyRequest> msg = std::make_shared<RubyRequest>(
+            clockEdge(), addr, (uint8_t*) 0, 0, 0,
+            RubyRequestType_FLUSH, RubyAccessMode_Supervisor,
+            nullptr);
+        assert(m_mandatory_q_ptr != NULL);
+        m_mandatory_q_ptr->enqueue(msg, clockEdge(), m_data_cache_hit_latency);
+        m_outstanding_wb++;
+    }
+	#endif
+    // Walk the cache
+    //for (int i = 0; i< size; i++) {
+        //Addr addr = m_dataCache_ptr->getAddressAtIdx(i);
+        //// Write dirty data back
+        //std::shared_ptr<RubyRequest> msg = std::make_shared<RubyRequest>(
+            //clockEdge(), addr, (uint8_t*) 0, 0, 0,
+            //RubyRequestType_FLUSH, RubyAccessMode_Supervisor,
+            //nullptr);
+        //assert(m_mandatory_q_ptr != NULL);
+        //m_mandatory_q_ptr->enqueue(msg, clockEdge(), m_data_cache_hit_latency);
+        //m_outstanding_wb++;
+    //}
 }

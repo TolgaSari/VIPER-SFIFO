@@ -46,6 +46,8 @@
 #include "mem/ruby/system/GPUCoalescer.hh"
 #include "mem/ruby/system/RubyPort.hh"
 
+#include "mem/ruby/structures/Sfifo.hh"
+
 class DataBlock;
 class CacheMsg;
 class MachineID;
@@ -62,6 +64,7 @@ class VIPERCoalescer : public GPUCoalescer
     void wbCallback(Addr address);
     void invCallback(Addr address);
     RequestStatus makeRequest(PacketPtr pkt);
+	Sfifo<Addr> coalFifo; // Tolga
   private:
     void invL1();
     void wbL1();
