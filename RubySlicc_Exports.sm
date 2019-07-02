@@ -175,7 +175,6 @@ enumeration(RubyRequestType, desc="...", default="RubyRequestType_NULL") {
   Release,           desc="Release operation";
   Acquire,           desc="Acquire opertion";
   AcquireRelease,    desc="Acquire and Release opertion";
-  Sfifo_Release,	 desc="Fancy release with use of Sfifo"; // modification
 }
 
 enumeration(SequencerRequestType, desc="...", default="SequencerRequestType_NULL") {

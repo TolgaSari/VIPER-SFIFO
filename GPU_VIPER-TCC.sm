@@ -250,7 +250,7 @@ machine(MachineType:TCC, "TCC Cache")
 
 
 // ** IN_PORTS **
-  in_port(triggerQueue_in, TriggerMsg, triggerQueue) {
+  in_port(triggerQueue_in, TiggerMsg, triggerQueue) {
     if (triggerQueue_in.isReady(clockEdge())) {
       peek(triggerQueue_in, TriggerMsg) {
         TBE tbe := TBEs.lookup(in_msg.addr);

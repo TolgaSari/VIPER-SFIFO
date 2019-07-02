@@ -332,19 +332,6 @@ class GPUCoalescer : public RubyPort
     Stats::Scalar CP_TCCStHits;
     Stats::Scalar CP_StMiss;
 
-    // Tolga - Add counters for barriers.
-    Stats::Scalar GPU_Releases;
-    Stats::Scalar GPU_Acquires;
-
-	Stats::Scalar GPU_DevReleases;
-	Stats::Scalar GPU_WaveReleases;
-	Stats::Scalar GPU_WorkReleases;
-	Stats::Scalar GPU_SysReleases;
-
-	Stats::Scalar GPU_DevAcquires;
-	Stats::Scalar GPU_WaveAcquires;
-	Stats::Scalar GPU_WorkAcquires;
-	Stats::Scalar GPU_SysAcquires;
     //! Histogram for number of outstanding requests per cycle.
     Stats::Histogram m_outstandReqHist;
 

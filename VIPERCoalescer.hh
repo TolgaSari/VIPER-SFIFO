@@ -38,7 +38,6 @@
 
 #include <iostream>
 
-#include "mem/protocol/HSAScope.hh"
 #include "mem/protocol/PrefetchBit.hh"
 #include "mem/protocol/RubyAccessMode.hh"
 #include "mem/protocol/RubyRequestType.hh"
@@ -63,11 +62,10 @@ class VIPERCoalescer : public GPUCoalescer
     void wbCallback(Addr address);
     void invCallback(Addr address);
     RequestStatus makeRequest(PacketPtr pkt);
-    void inc_counter(bool isAcquire, HSAScope accessScope);
   private:
     void invL1();
-    void wbL1(HSAScope scope, Addr adress);
-    void invwbL1(HSAScope scope, Addr adress);
+    void wbL1();
+    void invwbL1();
     uint64_t m_outstanding_inv;
     uint64_t m_outstanding_wb;
     uint64_t m_max_inv_per_cycle;

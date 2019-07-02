@@ -309,7 +309,6 @@ enumeration(TriggerType, desc="Trigger Type") {
   WriteData,            desc="Write to full cacheblock data";
   WriteDone,            desc="Sequencer says that write is done";
   AtomicDone,           desc="Atomic is done";
-  Sfifo_Release,		desc="Fancy Sfifo Release";
 }
 
 enumeration(CacheId, desc="Which Cache in the Core") {

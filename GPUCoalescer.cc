@@ -48,7 +48,6 @@
 #include "debug/MemoryAccess.hh"
 #include "debug/ProtocolTrace.hh"
 #include "debug/RubyPort.hh"
-#include "debug/SFIFO.hh" // Tolga - modification
 #include "debug/RubyStats.hh"
 #include "gpu-compute/shader.hh"
 #include "mem/packet.hh"
@@ -660,7 +659,6 @@ GPUCoalescer::hitCallback(GPUCoalescerRequest* srequest,
         // Note: RubyPort will access it's sender state before the
         // RubyTester.
         if (m_usingRubyTester) {
-//	DPRINTF(SFIFO, "in hit callback\n");
             RubyPort::SenderState *requestSenderState =
                 safe_cast<RubyPort::SenderState*>(pkt->senderState);
             RubyTester::SenderState* testerSenderState =
@@ -677,7 +675,6 @@ GPUCoalescer::hitCallback(GPUCoalescerRequest* srequest,
 
 
     completeHitCallback(mylist, len);
-//PRINTF(SFIFO, "out hit callback\n");
 }
 
 bool
@@ -706,7 +703,6 @@ GPUCoalescer::makeRequest(PacketPtr pkt)
         if (pkt->req->isAcquire()){
             // This is a Kernel Begin leave handling to
             // virtual xCoalescer::makeRequest
-			//GPU_Acquires++;// Tolga
             return RequestStatus_Issued;
         }else if (pkt->req->isRelease()) {
             // This is a Kernel End leave handling to
@@ -723,7 +719,6 @@ GPUCoalescer::makeRequest(PacketPtr pkt)
             if (!issueEvent.scheduled()) {
                 schedule(issueEvent, curTick());
             }
-			//GPU_Releases++;// Tolga
             return RequestStatus_Issued;
         }
     }
@@ -818,19 +813,11 @@ GPUCoalescer::makeRequest(PacketPtr pkt)
                 if (!issueEvent.scheduled()) {
                     schedule(issueEvent, curTick());
                 }
-				// Tolga
-//				if(pkt->req->isRelease())	GPU_Releases++;
-//				else						GPU_Acquires++;
-				// Tolga
                 return RequestStatus_Issued;
             } else {
                 // If not RfO, return issued here and let the child coalescer
                 // take care of it.
-				// Tolga
-//				if(pkt->req->isRelease())
-//				else GPU_Releases++;
-                // Tolga
-				return RequestStatus_Issued;
+                return RequestStatus_Issued;
             }
         } else {
             panic("Unsupported ruby packet type\n");
@@ -1192,7 +1179,6 @@ GPUCoalescer::recordCPWriteCallBack(MachineID myMachID, MachineID senderMachID)
 void
 GPUCoalescer::completeHitCallback(std::vector<PacketPtr> & mylist, int len)
 {
-//PRINTF(SFIFO, "in completeHitCallback\n");
     for (int i = 0; i < len; ++i) {
         RubyPort::SenderState *ss =
             safe_cast<RubyPort::SenderState *>(mylist[i]->senderState);
@@ -1206,7 +1192,6 @@ GPUCoalescer::completeHitCallback(std::vector<PacketPtr> & mylist, int len)
     }
 
     testDrainComplete();
-//PRINTF(SFIFO, "out completeHitCallback\n");
 }
 
 PacketPtr
@@ -1411,47 +1396,4 @@ GPUCoalescer::regStats()
         .name(name() + ".cp_st_misses")
         .desc("stores that miss in the GPU")
         ;
-	// Tolga - Make new stats print.
-	GPU_Releases
-		.name(name() + ".gpu_releases")
-		.desc("Total number of releases in GPU")
-		;
-	GPU_Acquires
-		.name(name() + ".gpu_acquires")
-		.desc("Total number of acquires in GPU")
-		;	
-
-	GPU_DevAcquires
-		.name(name() + ".gpu_device_acquires")
-		.desc("Total number of device scope acquires in GPU")
-		;
-	GPU_WaveAcquires
-		.name(name() + ".gpu_wavefront_acquires")
-		.desc("Total number of wavefront scope acquires in GPU")
-		;
-	GPU_WorkAcquires
-		.name(name() + ".gpu_workgroup_acquires")
-		.desc("Total number of workgroup scope acquires in GPU")
-		;
-	GPU_SysAcquires
-		.name(name() + ".gpu_system_acquires")
-		.desc("Total number of system scope acquires in GPU")
-		;
-
-	GPU_DevReleases
-		.name(name() + ".gpu_device_releases")
-		.desc("Total number of device scope releases in GPU")
-		;
-	GPU_WaveReleases
-		.name(name() + ".gpu_wavefront_releases")
-		.desc("Total number of wavefront scope releases in GPU")
-		;
-	GPU_WorkReleases
-		.name(name() + ".gpu_workgroup_releases")
-		.desc("Total number of workgroup scoe releases in GPU")
-		;
-	GPU_SysReleases
-		.name(name() + ".gpu_system_releases")
-		.desc("Total number of system scope releases in GPU")
-		;
 }

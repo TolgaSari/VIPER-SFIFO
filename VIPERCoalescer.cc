@@ -33,8 +33,6 @@
  * Author: Sooraj Puthoor
  */
 
-#define USE_SFIFO
-
 #include "base/misc.hh"
 #include "base/str.hh"
 #include "config/the_isa.hh"
@@ -45,12 +43,9 @@
 #endif // X86_ISA
 #include "mem/ruby/system/VIPERCoalescer.hh"
 
-#include "mem/protocol/HSAScope.hh"
-
 #include "cpu/testers/rubytest/RubyTester.hh"
 #include "debug/GPUCoalescer.hh"
 #include "debug/MemoryAccess.hh"
-#include "debug/SFIFO.hh" // Tolga - modification
 #include "mem/packet.hh"
 #include "mem/ruby/common/SubBlock.hh"
 #include "mem/ruby/network/MessageBuffer.hh"
@@ -83,34 +78,6 @@ VIPERCoalescer::~VIPERCoalescer()
 {
 }
 
-void VIPERCoalescer::inc_counter(bool isAcquire, HSAScope accessScope)
-{
-    if(isAcquire)
-    {
-        GPU_Acquires++;//Tolga	
-        switch(accessScope)
-        {
-            case  HSAScope::HSAScope_WAVEFRONT: GPU_WaveAcquires++; break;			
-            case  HSAScope::HSAScope_WORKGROUP: GPU_WorkAcquires++; break;			
-            case  HSAScope::HSAScope_DEVICE:	 GPU_DevAcquires++;  break;			
-            case  HSAScope::HSAScope_SYSTEM:	 GPU_SysAcquires++;  break;			
-            default:								         break;
-        }
-    }
-    else
-    {
-        GPU_Releases++;//Tolga
-        switch(accessScope)
-        {
-            case  HSAScope::HSAScope_WAVEFRONT: GPU_WaveReleases++; break;			
-            case  HSAScope::HSAScope_WORKGROUP: GPU_WorkReleases++; break;			
-            case  HSAScope::HSAScope_DEVICE:	GPU_DevReleases++;  break;			
-            case  HSAScope::HSAScope_SYSTEM:	GPU_SysReleases++;  break;			
-            default:								break;
-        }
-    }
-}
-
 // Analyzes the packet to see if this request can be coalesced.
 // If request can be coalesced, this request is added to the reqCoalescer table
 // and makeRequest returns RequestStatus_Issued;
@@ -123,8 +90,6 @@ void VIPERCoalescer::inc_counter(bool isAcquire, HSAScope accessScope)
 RequestStatus
 VIPERCoalescer::makeRequest(PacketPtr pkt)
 {
-    HSAScope accessScope = reqScopeToHSAScope(pkt->req); // Tolga - modification.
-
     if (m_outstanding_wb | m_outstanding_inv) {
         DPRINTF(GPUCoalescer,
                 "There are %d Writebacks and %d Invalidatons\n",
@@ -138,32 +103,25 @@ VIPERCoalescer::makeRequest(PacketPtr pkt)
             // If it is a Kerenl Begin flush the cache
             if (pkt->req->isAcquire() && (m_outstanding_inv == 0)) {
                 invL1();
-		        inc_counter(true, accessScope);	// Tolga - modification
             }
 
             if (pkt->req->isRelease()) {
                 insertKernel(pkt->req->contextId(), pkt);
-                inc_counter(false, accessScope);// Tolga - modification
             }
+
             return RequestStatus_Issued;
         }
 //        return RequestStatus_Aliased;
     } else if (pkt->req->isKernel() && pkt->req->isRelease()) {
         // Flush Dirty Data on Kernel End
         // isKernel + isRelease
-
-	    inc_counter(false, accessScope);	// Tolga - modification
-
         insertKernel(pkt->req->contextId(), pkt);
-        wbL1(reqScopeToHSAScope(pkt->req), pkt->req->getPaddr());// Tolga - modification
-		DPRINTF(SFIFO, "after wbL1 isKernel + isRelease\n");
+        wbL1();
         if (m_outstanding_wb == 0) {
             for (auto it =  kernelEndList.begin(); it != kernelEndList.end(); it++) {
                 newKernelEnds.push_back(it->first);
             }
-			DPRINTF(SFIFO, "it can get here\n");
             completeIssue();
-			DPRINTF(SFIFO, "it cant get here\n");
         }
         return RequestStatus_Issued;
     }
@@ -176,17 +134,11 @@ VIPERCoalescer::makeRequest(PacketPtr pkt)
     } else if (pkt->req->isKernel() && pkt->req->isAcquire()) {
         // Invalidate clean Data on Kernel Begin
         // isKernel + isAcquire
-	    inc_counter(true, accessScope);	// Tolga - modification
         invL1();
     } else if (pkt->req->isAcquire() && pkt->req->isRelease()) {
         // Deschedule the AtomicAcqRel and
         // Flush and Invalidate the L1 cache
-		if (pkt->req->isRelease()) // Tolga - modification
-	        inc_counter(false, accessScope);	// Tolga - modification
-		else
-	        inc_counter(true, accessScope);	
-
-        invwbL1(reqScopeToHSAScope(pkt->req), pkt->req->getPaddr());
+        invwbL1();
         if (m_outstanding_wb > 0 && issueEvent.scheduled()) {
             DPRINTF(GPUCoalescer, "issueEvent Descheduled\n");
             deschedule(issueEvent);
@@ -194,9 +146,7 @@ VIPERCoalescer::makeRequest(PacketPtr pkt)
     } else if (pkt->req->isRelease()) {
         // Deschedule the StoreRel and
         // Flush the L1 cache
-        inc_counter(false, accessScope);
-        wbL1(reqScopeToHSAScope(pkt->req), pkt->req->getPaddr());
-		DPRINTF(SFIFO, "after wbL1 flush L1 cache\n");
+        wbL1();
         if (m_outstanding_wb > 0 && issueEvent.scheduled()) {
             DPRINTF(GPUCoalescer, "issueEvent Descheduled\n");
             deschedule(issueEvent);
@@ -204,7 +154,6 @@ VIPERCoalescer::makeRequest(PacketPtr pkt)
     } else if (pkt->req->isAcquire()) {
         // LoadAcq or AtomicAcq
         // Invalidate the L1 cache
-        inc_counter(true, accessScope);// Tolga - modification
         invL1();
     }
     // Request was successful
@@ -281,52 +230,34 @@ VIPERCoalescer::invL1()
   * Writeback L1 cache (Release)
   */
 void
-VIPERCoalescer::wbL1(HSAScope msg_scope, uint64_t msg_addr)// Tolga - modification
+VIPERCoalescer::wbL1()
 {
-	#ifdef USE_SFIFO
-			
-	  DPRINTF(SFIFO,
-			  "Inside wbL1, making request with msg addr = %lx\n", (long) msg_addr);
-
-	  std::shared_ptr<RubyRequest> msg = std::make_shared<RubyRequest>(
-			  clockEdge(), msg_addr, (uint8_t*) 0, 0, 0,
-			  RubyRequestType_Sfifo_Release, RubyAccessMode_Supervisor,
-			  nullptr, PrefetchBit_No, 100, 99, msg_scope);
-
-	  assert(m_mandatory_q_ptr != NULL);
-	  m_mandatory_q_ptr->enqueue(msg, clockEdge(), m_data_cache_hit_latency);
-	  m_outstanding_wb+= 4;
-	  DPRINTF(SFIFO, "Exiting wbL1\n");
-
-	#else
-	  // Cache walk
-		int size = m_dataCache_ptr->getNumBlocks();
-		DPRINTF(GPUCoalescer,
-				"There are %d Writebacks outstanding before Cache Walk\n",
-				m_outstanding_wb);
-		// Walk the cache
-		for (int i = 0; i < size; i++) {
-			Addr addr = m_dataCache_ptr->getAddressAtIdx(i);
-			// Write dirty data back
-			std::shared_ptr<RubyRequest> msg = std::make_shared<RubyRequest>(
-				clockEdge(), addr, (uint8_t*) 0, 0, 0,
-				RubyRequestType_FLUSH, RubyAccessMode_Supervisor,
-				nullptr);
-			assert(m_mandatory_q_ptr != NULL);
-			m_mandatory_q_ptr->enqueue(msg, clockEdge(), m_data_cache_hit_latency);
-			m_outstanding_wb++;
-		}
-		DPRINTF(GPUCoalescer,
-				"There are %d Writebacks outstanding after Cache Walk\n",
-				m_outstanding_wb);
-	#endif
+    int size = m_dataCache_ptr->getNumBlocks();
+    DPRINTF(GPUCoalescer,
+            "There are %d Writebacks outstanding before Cache Walk\n",
+            m_outstanding_wb);
+    // Walk the cache
+    for (int i = 0; i < size; i++) {
+        Addr addr = m_dataCache_ptr->getAddressAtIdx(i);
+        // Write dirty data back
+        std::shared_ptr<RubyRequest> msg = std::make_shared<RubyRequest>(
+            clockEdge(), addr, (uint8_t*) 0, 0, 0,
+            RubyRequestType_FLUSH, RubyAccessMode_Supervisor,
+            nullptr);
+        assert(m_mandatory_q_ptr != NULL);
+        m_mandatory_q_ptr->enqueue(msg, clockEdge(), m_data_cache_hit_latency);
+        m_outstanding_wb++;
+    }
+    DPRINTF(GPUCoalescer,
+            "There are %d Writebacks outstanding after Cache Walk\n",
+            m_outstanding_wb);
 }
 
 /**
   * Invalidate and Writeback L1 cache (Acquire&Release)
   */
 void
-VIPERCoalescer::invwbL1(HSAScope msg_scope, uint64_t msg_addr)
+VIPERCoalescer::invwbL1()
 {
     int size = m_dataCache_ptr->getNumBlocks();
     // Walk the cache
@@ -341,34 +272,16 @@ VIPERCoalescer::invwbL1(HSAScope msg_scope, uint64_t msg_addr)
         m_mandatory_q_ptr->enqueue(msg, clockEdge(), m_data_cache_hit_latency);
         m_outstanding_inv++;
     }
-
-	#ifdef USE_SFIFO
-
-	  DPRINTF(SFIFO,
-			  "Inside invwbL1, making request with msg addr = %d\n", msg_addr);
-	  std::shared_ptr<RubyRequest> msg = std::make_shared<RubyRequest>(
-			  clockEdge(), msg_addr, (uint8_t*) 0, 0, 0,
-			  RubyRequestType_Sfifo_Release, RubyAccessMode_Supervisor,
-			  nullptr, PrefetchBit_No, 100, 99, msg_scope);
-	  assert(m_mandatory_q_ptr != NULL);
-	  m_mandatory_q_ptr->enqueue(msg, clockEdge(), m_data_cache_hit_latency);
-	  m_outstanding_wb+= 4;
-	  DPRINTF(SFIFO, "Exiting invwbL1\n");
-
-	#else
-
-		// Walk the cache
-			
-	  for (int i = 0; i< size; i++) {
-		  Addr addr = m_dataCache_ptr->getAddressAtIdx(i);
-		  // Write dirty data back
-		  std::shared_ptr<RubyRequest> msg = std::make_shared<RubyRequest>(
-			  clockEdge(), addr, (uint8_t*) 0, 0, 0,
-			  RubyRequestType_FLUSH, RubyAccessMode_Supervisor,
-			  nullptr);
-		  assert(m_mandatory_q_ptr != NULL);
-		  m_mandatory_q_ptr->enqueue(msg, clockEdge(), m_data_cache_hit_latency);
-		  m_outstanding_wb++;
-	  }
-	#endif
+    // Walk the cache
+    for (int i = 0; i< size; i++) {
+        Addr addr = m_dataCache_ptr->getAddressAtIdx(i);
+        // Write dirty data back
+        std::shared_ptr<RubyRequest> msg = std::make_shared<RubyRequest>(
+            clockEdge(), addr, (uint8_t*) 0, 0, 0,
+            RubyRequestType_FLUSH, RubyAccessMode_Supervisor,
+            nullptr);
+        assert(m_mandatory_q_ptr != NULL);
+        m_mandatory_q_ptr->enqueue(msg, clockEdge(), m_data_cache_hit_latency);
+        m_outstanding_wb++;
+    }
 }
